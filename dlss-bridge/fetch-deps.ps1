@@ -8,7 +8,15 @@ $tmp = Join-Path $env:TEMP "siris-deps"
 if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
 New-Item -ItemType Directory -Force $tmp, $root | Out-Null
 
-git clone --depth 1 https://github.com/NVIDIA/DLSS.git (Join-Path $tmp "DLSS")
+# Windows on Arm needs the Arm64 libraries, which first came with SDK 310.9.16, so that build is pinned to it.
+# The machine's value comes from the registry: a shell under x64 emulation (Git Bash) reports AMD64 in its environment.
+$arm64 = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment").PROCESSOR_ARCHITECTURE -eq "ARM64"
+$libFolder = if ($arm64) { "Windows_aarch64" } else { "Windows_x86_64" }
+if ($arm64) {
+    git clone --depth 1 --branch v310.9.16 https://github.com/NVIDIA/DLSS.git (Join-Path $tmp "DLSS")
+} else {
+    git clone --depth 1 https://github.com/NVIDIA/DLSS.git (Join-Path $tmp "DLSS")
+}
 git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers.git (Join-Path $tmp "Vulkan-Headers")
 
 $ngx = Join-Path $root "ngx"
@@ -16,8 +24,8 @@ New-Item -ItemType Directory -Force (Join-Path $ngx "lib"), (Join-Path $ngx "bin
 Copy-Item -Recurse -Force (Join-Path $tmp "DLSS\include") $ngx
 Copy-Item -Force (Join-Path $tmp "DLSS\LICENSE.txt") $ngx
 function Find-One($name) {
-    # x64 only (the SDK also ships aarch64 / arm64ec builds); release DLLs, not the dev ones.
-    $file = Get-ChildItem -Recurse (Join-Path $tmp "DLSS\lib\Windows_x86_64") -Filter $name |
+    # This machine's architecture; release DLLs, not the dev ones.
+    $file = Get-ChildItem -Recurse (Join-Path $tmp "DLSS\lib\$libFolder") -Filter $name |
         Where-Object { $_.FullName -notmatch "\\dev\\|\\vs20\d\d\\|\\khr\\|\\uwp\\" } | Select-Object -First 1
     if (-not $file) { throw "$name not found in the DLSS SDK" }
     return $file.FullName

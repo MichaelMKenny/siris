@@ -3,8 +3,15 @@ rem Builds siris.dll and the probe with MSVC (Visual Studio 2022).
 rem The project lives in a deep folder; MSVC cannot open headers past MAX_PATH, so the build runs
 rem on a temporary drive letter (subst) that is removed again afterwards.
 setlocal
-for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set VSDIR=%%I
-call "%VSDIR%\VC\Auxiliary\Build\vcvars64.bat" >nul 2>nul
+rem An Arm64 JVM (Windows on Arm) cannot load an x64 DLL, so the bridge is built for the machine it is built on.
+rem The machine's value comes from the registry: a shell under x64 emulation (Git Bash) reports AMD64 in its environment.
+for /f "tokens=3" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v PROCESSOR_ARCHITECTURE') do set MACHINE_ARCH=%%A
+set VCTOOLS=Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+set VCVARS=vcvars64.bat
+if /i "%MACHINE_ARCH%"=="ARM64" set VCTOOLS=Microsoft.VisualStudio.Component.VC.Tools.ARM64
+if /i "%MACHINE_ARCH%"=="ARM64" set VCVARS=vcvarsarm64.bat
+for /f "usebackq delims=" %%I in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires %VCTOOLS% -property installationPath`) do set VSDIR=%%I
+call "%VSDIR%\VC\Auxiliary\Build\%VCVARS%" >nul 2>nul
 where cl >nul 2>nul || (echo MSVC not found & exit /b 1)
 
 set DRIVE=
