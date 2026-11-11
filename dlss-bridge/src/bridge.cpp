@@ -900,6 +900,7 @@ struct Presenter {
     // Present wait that never comes back (seen as a few fps otherwise): the presenter stops relying on it.
     int presentWaitMisses = 0;
     std::atomic<bool> presentWaitStuck{false};
+    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;  // of the current swapchain (presenter thread)
     std::atomic<float> judderMs{0.0f};
     double previousStart = 0.0;  // frame start of the previous job (presenter thread)
     std::atomic<bool> monitorLimit{false};
@@ -1131,6 +1132,7 @@ bool createSwapchain(std::string& error) {
     }
     g_present.swapchain = swapchain;
     g_present.extent = extent;
+    g_present.presentMode = mode;
     g_vk.getSwapchainImages(g_vk.device, swapchain, &count, nullptr);
     g_present.swapImages.resize(count);
     g_vk.getSwapchainImages(g_vk.device, swapchain, &count, g_present.swapImages.data());
@@ -1176,8 +1178,11 @@ void markShown(double shown, double content) {
     timing.lastContent = content;
 }
 
+// Only with VSync (FIFO): without it present wait only measured, and on Windows on Arm (RTX Spark N1X, driver 621.14)
+// an IMMEDIATE present carrying a present id, on a window filling the screen, crashes in the driver (null read in
+// nvogla64.dll, every run; 854x480 was fine).
 bool usePresentWait() {
-    return g_vk.presentWait && !g_present.presentWaitStuck;
+    return g_vk.presentWait && !g_present.presentWaitStuck && g_present.presentMode == VK_PRESENT_MODE_FIFO_KHR;
 }
 
 // Blits source to the next swapchain image once the game's submission reached `ready`. Returns the
@@ -1263,10 +1268,15 @@ uint64_t showImage(const LocalImage& source, uint64_t ready, double content) {
     VkPresentIdKHR presentId{VK_STRUCTURE_TYPE_PRESENT_ID_KHR};
     presentId.swapchainCount = 1;
     presentId.pPresentIds = &id;
-    present.pNext = g_vk.presentWait ? &presentId : nullptr;
+    present.pNext = usePresentWait() ? &presentId : nullptr;
     result = g_vk.queuePresent(g_vk.presentQueue, &present);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         g_present.recreate = true;
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        // Nothing was queued, so there is nothing to wait for.
+        g_present.recreate = true;
+        return 0;
     }
     g_present.shownCount++;
     if (!usePresentWait()) {
