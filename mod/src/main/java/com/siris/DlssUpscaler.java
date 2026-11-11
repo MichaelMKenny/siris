@@ -970,8 +970,12 @@ public final class DlssUpscaler {
         new Matrix4d(clipToPrevClip).invert().get(p, 48);
         p[64] = reportedJitterX();
         p[65] = reportedJitterY();
-        p[66] = 1.0F / renderWidth;
-        p[67] = 1.0F / renderHeight;
+        // Motion vectors in render pixels, scale 1. NGX's header says the scale should bring them to [-1, 1], but DLSS-G
+        // reads 1 / width as almost no motion: its optical-flow model covered that (4060 Ti, RTX Spark N1X), while
+        // FG Lite (driver Preset C) has no optical flow and only cross-faded the two real frames. RTX Spark N1X, Lite, x3,
+        // spin: generated frames at 0.01 / 0.95 of the way between real frames -> 0.35 / 0.70 (2026-11-11).
+        p[66] = 1.0F;
+        p[67] = 1.0F;
         p[68] = (float) currentPosition.x;
         p[69] = (float) currentPosition.y;
         p[70] = (float) currentPosition.z;

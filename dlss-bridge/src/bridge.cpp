@@ -2156,10 +2156,14 @@ SIRIS_API int32_t siris_present(uint64_t commandBuffer, const SirisImage* frame,
         }
         pipelineBarrier(cmd, static_cast<uint32_t>(afterEval.size()), afterEval.data());
         if (g_capture.remaining > 0) {
-            // Generated frame (between the previous and this real frame), then this real frame.
+            // Generated frames (between the previous and this real frame, in the order shown), then this real frame.
             wchar_t name[64];
             std::swprintf(name, 64, L"fg_%03d_a_generated.png", g_capture.frame);
             captureImage(cmd, slot.interp[0].image, g_present.width, g_present.height, name);
+            for (int i = 1; i < generated; i++) {
+                std::swprintf(name, 64, L"fg_%03d_a%d_generated.png", g_capture.frame, i + 1);
+                captureImage(cmd, slot.interp[i].image, g_present.width, g_present.height, name);
+            }
             std::swprintf(name, 64, L"fg_%03d_b_real.png", g_capture.frame);
             captureImage(cmd, slot.real.image, g_present.width, g_present.height, name);
             std::swprintf(name, 64, L"fg_%03d_c_motion.png", g_capture.frame);

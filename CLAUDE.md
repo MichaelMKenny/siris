@@ -268,7 +268,12 @@ Goal: shader packs (Solas) + DLSS SR/FG on Vulkan, in the user's Lunar Client. W
   overlay in the HUD (`HudMixin`). Screenshot them with `-PdlssScreen=mod|sodium|sodium2` (`DevScreens`).
 - Multi frame generation: 2x/3x/4x (`frameGenMultiplier`), limited to the GPU's `DLSSG.MultiFrameCountMax`
   (4060 Ti: 2x only). One DLSS-G evaluate per generated frame. Frames are paced evenly over the game's frame
-  interval with and without VSync. 3x/4x verified in a friend's log (RTX 50, Lunar).
+  interval with and without VSync. 3x/4x verified in a friend's log (RTX 50, Lunar), and on screen 2026-11-11 (RTX Spark N1X).
+- DLSS-G motion vectors (2026-11-11, contributor's RTX Spark N1X: Windows on Arm, 3270x2180 @ 120 Hz, G-SYNC): `mvecScale` is
+  1 (render pixels), not 1/width as NGX's header suggests. With 1/width DLSS-G saw almost no motion; its optical-flow model
+  hid that, but FG Lite (driver DLSS-FG Preset C) only cross-faded the real frames: x3 generated frames at 0.01 / 0.95 of the way
+  (120 shown moved like 40), now 0.35 / 0.70. Check with `-PdlssDebug=spin` captures (`fg_NNN_a2_generated.png` etc. for x3/x4)
+  and the image shift between them. The old "FG smear at tree edges while turning" may come from the same thing: recheck.
 - Hardware: FG needs RTX 40/50; on the RTX 3070 dev machine FG fails with
   `NVSDK_NGX_Result_FAIL_UnableToInitializeFeature` (expected). `dlss-bridge/out/dlss_probe.exe` reports SR/FG.
 
